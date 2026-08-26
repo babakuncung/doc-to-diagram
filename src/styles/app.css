@@ -127,3 +127,30 @@ main{position:relative;overflow:hidden}
   padding:0 12px;opacity:0;transition:opacity var(--fast),color var(--fast)}
 .doc-row:hover .doc-del{opacity:1}
 .doc-del:hover{color:var(--neg)}
+
+/* ── Account menu (top-right) ───────────────────────────────────── */
+.auth{position:relative;display:flex}
+.auth-btn.on{border-color:var(--accent);color:var(--accent)}
+.auth-pop{position:absolute;right:0;top:calc(100% + 8px);width:250px;z-index:9;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:12px;display:flex;flex-direction:column;gap:8px}
+.auth-tabs{display:flex;background:var(--raised);border:1px solid var(--line);
+  border-radius:var(--r-sm);padding:2px;gap:2px}
+.auth-tabs button{flex:1;font:inherit;font-size:11.5px;font-weight:500;color:var(--muted);
+  background:none;border:0;border-radius:3px;padding:4px 0;cursor:pointer;transition:all var(--fast)}
+.auth-tabs button.on{background:var(--panel);color:var(--ink);box-shadow:0 0 0 1px var(--line)}
+.auth-pop input{font:inherit;font-size:12.5px;color:var(--ink);background:var(--panel);
+  border:1px solid var(--line);border-radius:var(--r-sm);padding:6px 9px;outline:none;
+  transition:border-color var(--fast)}
+.auth-pop input:hover{border-color:var(--faint)}
+.auth-pop input:focus{border-color:var(--accent)}
+.auth-err{font-size:11px;color:var(--neg);line-height:1.5}
+.auth-main{text-align:center;padding:6px 0}
+.auth-or{display:flex;align-items:center;gap:8px;color:var(--faint);font-size:10.5px;
+  letter-spacing:.08em;text-transform:uppercase}
+.auth-or::before,.auth-or::after{content:"";flex:1;height:1px;background:var(--line)}
+.auth-gh{display:flex;align-items:center;justify-content:center;gap:7px;padding:6px 0}
+.auth-me{padding:2px 2px 6px;border-bottom:1px solid var(--line-soft)}
+.auth-me-name{font-size:13px;font-weight:560}
+.auth-me-mail{font-size:11px;color:var(--faint);margin-top:2px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
