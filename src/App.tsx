@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { createBoard } from './lib/board.js'
 import { supabase } from './lib/supabase'
 import { listDocs, createDoc, updateDoc, deleteDoc, type Doc } from './lib/docs'
+import AuthMenu from './components/AuthMenu'
+import type { Session } from './lib/auth'
 
 type Sel = {
   id: string; name: string; level: number; kids: number
@@ -31,6 +33,7 @@ export default function App() {
   const [docs, setDocs] = useState<Doc[] | null>(null)
   const [docId, setDocId] = useState<string | null>(null)
   const [cloudMsg, setCloudMsg] = useState('')
+  const [session, setSession] = useState<Session | null>(null)
 
   useEffect(() => {
     const b = createBoard({
@@ -38,12 +41,21 @@ export default function App() {
       on: { stats: setStats, sel: setSel, zoom: setZoom },
     })
     api.current = b
-    if (supabase) listDocs().then(setDocs).catch(e => setCloudMsg(String(e.message ?? e)))
     return () => { b.dispose(); api.current = null }
   }, [])
 
   const flash = (m: string) => { setCloudMsg(m); setTimeout(() => setCloudMsg(''), 2400) }
   const refreshDocs = () => listDocs().then(setDocs).catch(e => flash(String(e.message ?? e)))
+
+  /* The cloud list follows the auth state: sign-in loads it, sign-out clears
+     it. The old anonymous-owner rows (pre-login) are adopted lazily — the
+     first save after login still carries anon_owner, linking old and new. */
+  const onSession = (s: Session | null) => {
+    setSession(s)
+    setDocId(null)
+    if (s) listDocs().then(setDocs).catch(e => flash(String(e.message ?? e)))
+    else setDocs(null)
+  }
 
   const saveCloud = async () => {
     const text = src.current!.value
@@ -114,7 +126,7 @@ export default function App() {
           </div>
         </div>
 
-        {supabase && (
+        {supabase && session && (
           <div className="cloud">
             <div className="cloud-hd">
               <span className="cloud-tt">Cloud documents</span>
@@ -158,6 +170,7 @@ export default function App() {
             {folded ? 'Restore' : 'Fullscreen'}</button>
           <button className="mini" id="exp-svg" type="button" onClick={() => api.current?.expSvg()}>SVG</button>
           <button className="mini primary" id="exp-png" type="button" onClick={() => api.current?.expPng()}>PNG</button>
+          {supabase && <AuthMenu onSession={onSession} />}
         </div>
 
         <div id="insp" className={sel ? 'on' : ''}>
