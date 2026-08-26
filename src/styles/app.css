@@ -1,109 +1,21 @@
-/* Turns text into a structure diagram. Requests for this are often a single
- * line — "make the above into a mind map" — so the bar for this page is:
- * paste in, choose nothing, get a diagram.
- *
- * Four hard constraints outrank any visual idea:
- *   1. Zero configuration. Paste and the diagram appears; the layout is
- *      inferred, not asked — arrows mean flow, hierarchy means mind map,
- *      flat lists mean network. The user can override, but never has to pick first.
- *   2. Must be editable. Auto-layout is never fully right. Nodes can be
- *      dragged, collapsed, and renamed, or the only fix is rewriting the source.
- *   3. Label typography is a hard requirement. Text that is too small or nodes
- *      packed too dense make a correct diagram unreadable, so font size has a
- *      floor, nodes size to their content, and wrapping goes by character
- *      width instead of spaces.
- *   4. Destinations are slides and docs. SVG / PNG export is not a bonus,
- *      it is a necessity.
- *
- * Look: "white studio" — paper white, hairlines, a single ink green.
- * The diagram is the protagonist; the chrome steps back. */
-
-:root{
-  --bg:#f7f6f3; --panel:#fff; --raised:#f0efeb; --ink:#1b1a17;
-  --muted:#666359; --faint:#a09c92; --line:#e4e2db; --line-soft:#f0efe9;
-  --accent:#2c5545; --accent-ink:#fff; --accent-soft:#e6ede9;
-  --r:6px; --r-sm:4px;
-  --n1:#2c5545; --n2:#8a6d3b; --n3:#5b6ea8; --n4:#96504f; --n5:#4a7a6d; --n6:#7a5a86;
-}
-html[data-skin=slate]{
-  --bg:#1b1f22; --panel:#22282c; --raised:#2a3136; --ink:#e6eaec; --muted:#9aa4aa;
-  --faint:#657077; --line:#333c42; --line-soft:#2a3237; --accent:#7ecfae; --accent-ink:#0d1a15;
-  --accent-soft:#1d2f28;
-  --n1:#7ecfae; --n2:#e0b062; --n3:#8aa4e8; --n4:#e08a86; --n5:#6fc0c8; --n6:#b493d6;
-}
-html[data-skin=blueprint]{
-  --bg:#10365c; --panel:#123f6b; --raised:#154877; --ink:#e2eefb; --muted:#a6c3e0;
-  --faint:#6d92ba; --line:#255a8e; --line-soft:#1a4a7c; --accent:#ffd479; --accent-ink:#14324f;
-  --accent-soft:#1d5183;
-  --n1:#ffd479; --n2:#9fe0c8; --n3:#a8c8f0; --n4:#f0a8a8; --n5:#8fd8e8; --n6:#d0b0f0;
-}
-html,body{height:100%;overflow:hidden}
-body{background:var(--bg);color:var(--ink);font-size:13px;-webkit-font-smoothing:antialiased}
-
-#app{display:grid;grid-template-columns:296px 1fr;height:100vh}
-#app.folded{grid-template-columns:0 1fr}
-@media (max-width:1080px){#app{grid-template-columns:252px 1fr}}
-
-/* ── Left: source text ──────────────────────────────────────────── */
-aside{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;
-  min-height:0;overflow:hidden}
-.hd{padding:16px 17px 13px;border-bottom:1px solid var(--line-soft)}
-.hd h1{font-size:15px;font-weight:560;letter-spacing:-.015em}
-.hd p{font-size:11.5px;color:var(--faint);margin-top:6px;line-height:1.65}
-.src{flex:1;min-height:0;display:flex;flex-direction:column}
-.src textarea{flex:1;min-height:0;width:100%;border:0;outline:none;resize:none;
-  background:none;color:var(--ink);font:12.5px/1.85 var(--mono);padding:14px 17px;
-  tab-size:2}
-.src textarea::placeholder{color:var(--faint)}
-.srcfoot{border-top:1px solid var(--line-soft);padding:10px 14px;display:flex;gap:7px;align-items:center}
-.srcfoot .sp{flex:1}
-.mini{font:inherit;font-size:11.5px;color:var(--muted);background:none;border:1px solid var(--line);
-  border-radius:var(--r-sm);padding:4px 9px;cursor:pointer;transition:all var(--fast)}
-.mini:hover{border-color:var(--faint);color:var(--ink)}
-.mini.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.mini input{display:none}
-.parsed{font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.03em}
-
-/* ── Right: canvas ──────────────────────────────────────────────── */
-main{position:relative;overflow:hidden}
-#bg{position:absolute;inset:0;width:100%;height:100%;z-index:0}
-#board{position:absolute;inset:0;width:100%;height:100%;z-index:1;cursor:grab;touch-action:none}
-#board.drag{cursor:grabbing}
-#board text{user-select:none}
-
-/* width:max-content is the key here. An absolutely positioned element's available
-   width is "containing-block width − left", and with left:50% it would shrink
-   against half the screen — wrapping while half the space is still free. */
-#bar{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:4;
-  display:flex;align-items:center;gap:5px;background:color-mix(in srgb,var(--panel) 92%,transparent);
-  border:1px solid var(--line);border-radius:99px;padding:5px 7px;backdrop-filter:blur(9px);
-  width:max-content;max-width:calc(100% - 28px);flex-wrap:wrap;justify-content:center}
-#zlvl{font-family:var(--mono);font-size:10.5px;min-width:44px;letter-spacing:0}
-.tb{font:inherit;font-size:11.5px;color:var(--muted);background:none;border:0;border-radius:99px;
-  padding:5px 11px;cursor:pointer;transition:all var(--fast);white-space:nowrap}
-.tb:hover{color:var(--ink);background:var(--raised)}
-.tb.on{color:var(--accent-ink);background:var(--accent)}
-.sep{width:1px;height:16px;background:var(--line);margin:0 3px}
-
-#top{position:absolute;right:14px;top:13px;z-index:4;display:flex;gap:6px;align-items:center}
-#hintbox{position:absolute;left:16px;top:13px;z-index:4;font-family:var(--mono);font-size:10px;
-  color:var(--faint);letter-spacing:.04em;line-height:1.8;pointer-events:none}
-
-#insp{position:absolute;right:14px;bottom:70px;z-index:4;width:250px;
-  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
-  padding:13px 14px;display:none}
-#insp.on{display:block}
-#insp h3{font-size:13px;font-weight:560;display:flex;align-items:center;gap:7px}
-#insp h3 i{width:8px;height:8px;border-radius:2px;flex:none}
-#insp .lv{font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:5px;letter-spacing:.05em}
-#insp .note{font-size:12px;line-height:1.7;color:var(--muted);margin-top:9px}
-#insp .acts{display:flex;gap:6px;margin-top:12px}
-#insp .acts .mini{flex:1;text-align:center}
-#insp input.rename{width:100%;margin-top:9px;font-size:12.5px}
-
-.node rect{transition:fill .16s var(--ease),stroke .16s var(--ease)}
-.node.sel rect{stroke-width:2}
-.node .cap{cursor:pointer}
-.link{fill:none;transition:stroke-opacity .2s var(--ease)}
-.dim{opacity:.2}
 .badge-c{cursor:pointer}
+
+/* ── Cloud documents (Supabase) ─────────────────────────────────── */
+.cloud{border-top:1px solid var(--line);max-height:34%;display:flex;flex-direction:column;flex:none}
+.cloud-hd{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--line-soft)}
+.cloud-tt{font-size:10.5px;font-weight:500;letter-spacing:.09em;text-transform:uppercase;color:var(--faint)}
+.cloud-msg{font-size:10.5px;color:var(--accent);font-family:var(--mono);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.cloud-list{overflow-y:auto;min-height:0}
+.cloud-empty{padding:12px 14px;font-size:11.5px;color:var(--faint);line-height:1.6}
+.doc-row{display:flex;align-items:stretch;border-bottom:1px solid var(--line-soft)}
+.doc-row:last-child{border-bottom:0}
+.doc-row.on{background:var(--accent-soft)}
+.doc-open{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;padding:8px 4px 8px 14px;
+  background:none;border:0;font:inherit;text-align:left;cursor:pointer}
+.doc-name{font-size:12.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.doc-date{font-family:var(--mono);font-size:10px;color:var(--faint)}
+.doc-del{background:none;border:0;font:inherit;font-size:14px;color:var(--faint);cursor:pointer;
+  padding:0 12px;opacity:0;transition:opacity var(--fast),color var(--fast)}
+.doc-row:hover .doc-del{opacity:1}
+.doc-del:hover{color:var(--neg)}
