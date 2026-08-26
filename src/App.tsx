@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createBoard } from './lib/board.js'
+import { supabase } from './lib/supabase'
+import { listDocs, createDoc, updateDoc, deleteDoc, type Doc } from './lib/docs'
 
 type Sel = {
   id: string; name: string; level: number; kids: number
@@ -25,14 +27,59 @@ export default function App() {
   const [skinI, setSkinI] = useState(0)
   const [folded, setFolded] = useState(false)
 
+  // Cloud documents (Supabase). Null while the first load is in flight.
+  const [docs, setDocs] = useState<Doc[] | null>(null)
+  const [docId, setDocId] = useState<string | null>(null)
+  const [cloudMsg, setCloudMsg] = useState('')
+
   useEffect(() => {
     const b = createBoard({
       board: board.current!, bgc: bg.current!, src: src.current!,
       on: { stats: setStats, sel: setSel, zoom: setZoom },
     })
     api.current = b
+    if (supabase) listDocs().then(setDocs).catch(e => setCloudMsg(String(e.message ?? e)))
     return () => { b.dispose(); api.current = null }
   }, [])
+
+  const flash = (m: string) => { setCloudMsg(m); setTimeout(() => setCloudMsg(''), 2400) }
+  const refreshDocs = () => listDocs().then(setDocs).catch(e => flash(String(e.message ?? e)))
+
+  const saveCloud = async () => {
+    const text = src.current!.value
+    if (!text.trim()) return flash('Nothing to save')
+    try {
+      if (docId) {
+        await updateDoc(docId, text)
+        flash('Updated in cloud')
+      } else {
+        const d = await createDoc(text)
+        setDocId(d.id)
+        flash('Saved to cloud')
+      }
+      refreshDocs()
+    } catch (e: any) { flash(String(e.message ?? e)) }
+  }
+
+  const openCloud = (d: Doc) => {
+    src.current!.value = d.content
+    src.current!.dispatchEvent(new Event('input'))
+    setDocId(d.id)
+  }
+
+  const removeCloud = async (d: Doc) => {
+    try {
+      await deleteDoc(d.id)
+      if (docId === d.id) setDocId(null)
+      refreshDocs()
+    } catch (e: any) { flash(String(e.message ?? e)) }
+  }
+
+  const fmtDate = (iso: string) => {
+    const d = new Date(iso)
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' +
+           d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  }
 
   const cycleSkin = () => {
     const i = (skinI + 1) % SKINS.length
@@ -66,6 +113,33 @@ export default function App() {
             </span>
           </div>
         </div>
+
+        {supabase && (
+          <div className="cloud">
+            <div className="cloud-hd">
+              <span className="cloud-tt">Cloud documents</span>
+              <span className="cloud-msg">{cloudMsg}</span>
+              <span className="sp"></span>
+              <button className="mini primary" type="button" onClick={saveCloud}>
+                {docId ? 'Update' : 'Save'}</button>
+            </div>
+            <div className="cloud-list">
+              {docs === null && <div className="cloud-empty">Loading…</div>}
+              {docs !== null && docs.length === 0 &&
+                <div className="cloud-empty">Nothing saved yet — hit Save to keep this document in the cloud.</div>}
+              {docs?.map(d => (
+                <div key={d.id} className={'doc-row' + (d.id === docId ? ' on' : '')}>
+                  <button className="doc-open" type="button" onClick={() => openCloud(d)}>
+                    <span className="doc-name">{d.title}</span>
+                    <span className="doc-date">{fmtDate(d.updated_at)}</span>
+                  </button>
+                  <button className="doc-del" type="button" title="Delete"
+                    onClick={() => removeCloud(d)}>×</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </aside>
 
       <main>
