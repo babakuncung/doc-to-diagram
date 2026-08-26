@@ -7,10 +7,9 @@ export type Doc = {
   updated_at: string
 }
 
-/* There is no auth on this page, so "whose document is this" is a random UUID
-   minted once per browser. It is a privacy convenience, not a security
-   boundary — the table policy is open to the anon key. */
-export function getOwner(): string {
+/* Pre-auth browsers stored their cloud documents under a random local UUID.
+   That UUID is kept around so the first login can claim those rows. */
+export function getAnonOwner(): string {
   const K = 'doc-to-diagram:owner'
   let v = localStorage.getItem(K)
   if (!v) {
@@ -30,12 +29,19 @@ export function titleOf(text: string): string {
   return 'Untitled'
 }
 
+/* Ownership now comes from the auth token — the RLS policy checks
+   owner = auth.uid(), so inserts must not send an owner column at all. */
+async function uid(): Promise<string> {
+  const { data, error } = await supabase!.auth.getUser()
+  if (error || !data.user) throw new Error('Sign in to use cloud documents')
+  return data.user.id
+}
+
 export async function listDocs(): Promise<Doc[]> {
-  if (!supabase) return []
-  const { data, error } = await supabase
+  await uid()
+  const { data, error } = await supabase!
     .from('documents')
     .select('id, title, content, updated_at')
-    .eq('owner', getOwner())
     .order('updated_at', { ascending: false })
     .limit(50)
   if (error) throw error
@@ -43,9 +49,10 @@ export async function listDocs(): Promise<Doc[]> {
 }
 
 export async function createDoc(content: string): Promise<Doc> {
+  const owner = await uid()
   const { data, error } = await supabase!
     .from('documents')
-    .insert({ owner: getOwner(), title: titleOf(content), content })
+    .insert({ owner, title: titleOf(content), content, anon_owner: getAnonOwner() })
     .select('id, title, content, updated_at')
     .single()
   if (error) throw error
@@ -53,6 +60,7 @@ export async function createDoc(content: string): Promise<Doc> {
 }
 
 export async function updateDoc(id: string, content: string): Promise<void> {
+  await uid()
   const { error } = await supabase!
     .from('documents')
     .update({ title: titleOf(content), content, updated_at: new Date().toISOString() })
@@ -61,6 +69,7 @@ export async function updateDoc(id: string, content: string): Promise<void> {
 }
 
 export async function deleteDoc(id: string): Promise<void> {
+  await uid()
   const { error } = await supabase!.from('documents').delete().eq('id', id)
   if (error) throw error
 }
