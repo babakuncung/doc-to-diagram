@@ -25,12 +25,24 @@ export async function signUpEmail(email: string, password: string): Promise<void
   }
 }
 
+/* Probe the provider first: if GitHub is not (fully) configured in Supabase,
+   the authorize endpoint answers with a JSON error instead of a redirect.
+   Catching it here keeps the user on the page with a readable message instead
+   of landing on a raw {"code":400,...} JSON document. */
 export async function signInGithub(): Promise<void> {
-  const { error } = await supabase!.auth.signInWithOAuth({
+  const { data, error } = await supabase!.auth.signInWithOAuth({
     provider: 'github',
-    options: { redirectTo: window.location.origin },
+    options: { redirectTo: window.location.origin, skipBrowserRedirect: true },
   })
   if (error) throw error
+  if (!data?.url) throw new Error('GitHub sign-in is unavailable right now.')
+  try {
+    const r = await fetch(data.url, { method: 'HEAD', redirect: 'manual' })
+    if (r.status >= 400) throw new Error('bad')
+  } catch {
+    throw new Error('GitHub sign-in is not configured yet. The site owner needs to paste the GitHub OAuth Client ID and Secret in Supabase → Authentication → Providers → GitHub.')
+  }
+  window.location.assign(data.url)
 }
 
 export async function signOut(): Promise<void> {
